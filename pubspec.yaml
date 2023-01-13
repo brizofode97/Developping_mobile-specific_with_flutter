@@ -33,6 +33,8 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.2
   audioplayers: ^2.0.0
+  video_player: ^2.4.10
+  webview_flutter: ^4.0.1
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -76,7 +78,7 @@ flutter:
     - assets/audio/glyphs/e.mp3
     - assets/audio/glyphs/o.mp3
     - assets/audio/lessons/script.mp3 
-    - assets/   
+    - assets/video/glyphs
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

@@ -1,8 +1,13 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 
 import 'dart:convert';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import 'package:local_state_stateful/video_glyph.dart';
 
 class GlyphListWidget extends StatefulWidget {
   const GlyphListWidget({super.key});
@@ -66,11 +71,27 @@ class _GlyphList extends State<GlyphListWidget> {
                                 fontSize: 11.0,
                                 fontWeight: FontWeight.normal,
                                 color: Colors.blueAccent)),
-                        trailing: IconButton(
-                          color: Colors.orange,
-                          icon: const Icon(Icons.play_circle_outline),
-                          onPressed: () => _playShortSound("audio/glyphs/${glyph["audio"]}") ,
-                        )),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              color: Colors.orange,
+                              icon: const Icon(Icons.play_circle_outline),
+                              onPressed: () => _playShortSound(glyph["audio"]),
+                            ),
+                            IconButton(
+                              color: Colors.deepPurple,
+                              icon: const Icon(Icons.topic_outlined),
+                              onPressed: () => _showWebContent(glyph["web"]),
+                            ),
+                            IconButton(
+                              color: Colors.teal,
+                              icon: const Icon(Icons.videocam_rounded),
+                              onPressed: () =>
+                                  _playStrokeOrderVideo(glyph["video"]),
+                            )
+                          ],
+                        ))                        
               ],
             );
           } else if (snapshot.hasError) {
@@ -100,4 +121,42 @@ class _GlyphList extends State<GlyphListWidget> {
       player.play(AssetSource(asset));
     }
   }
+
+  void _playStrokeOrderVideo(String filename) {
+    showDialog(context: context, builder: (BuildContext context) {
+      return VideoDialogBox(
+        file: "assets/video/glyphs/$filename",
+      );
+    });
+  }
+
+  void _showWebContent(String url) {
+    Navigator.push(
+        context,
+        PageRouteBuilder(
+            opaque: false,
+            pageBuilder: (BuildContext context, _, __) {
+              return Scaffold(
+                  appBar: AppBar(
+                    title: const Text('Glyph Info'),
+                  ),
+                  body: WebView(
+                    initialUrl: url,
+                    navigationDelegate: (request) {
+                      if (request.url == url) {
+                        // Wikipedia redirects to .m domain for mobile phones,
+                        // so had to change address to the .m domain
+                        return NavigationDecision.navigate;
+                      } else {
+                        // The delegate is triggered for all requests, including the initial one
+                        return NavigationDecision.prevent;
+                      }
+                    },
+                  ));
+            }));
+  }
+
 }
+
+
+
