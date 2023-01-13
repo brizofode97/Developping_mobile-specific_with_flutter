@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'dart:convert';
@@ -5,19 +6,25 @@ import 'dart:convert';
 class LessonListWidget extends StatefulWidget {
   const LessonListWidget({super.key});
 
-
   @override
   State<LessonListWidget> createState() {
     return _LessonList();
   }
-
 }
 
 class _LessonList extends State<LessonListWidget> {
-  late Future<List<dynamic>> lessons;
+  late Future<List<dynamic>> _lessons;
+
+  late AudioPlayer _lessonPlayer;
+  late AudioCache _audioCache;
+
+  dynamic _lessonPlaying;
+  double _currentPlayingPosition = 0;
+  double _currentPlayingDuration = 0;
 
   Future<List<dynamic>> fetchList() async {
-    // await Future.delayed(Duration(seconds: 5));
+    await Future.delayed(const Duration(seconds: 5));
+    // ignore: use_build_context_synchronously
     String s = await DefaultAssetBundle.of(context)
         .loadString('assets/config/lessons.json');
     return json.decode(s);
@@ -26,49 +33,158 @@ class _LessonList extends State<LessonListWidget> {
   @override
   void initState() {
     super.initState();
-    lessons = fetchList();
+    _lessonPlayer = AudioPlayer();
+    //_audioCache = new AudioCache(prefix: "assets/audio/lessons/", fixedPlayer: _lessonPlayer);
+
+    /*_lessonPlayer.onPlayerError.listen((msg) {
+      setState(() {
+        _currentPlayingDuration = 0.0;
+        _currentPlayingPosition = 0.0;
+        _lessonPlaying = null;
+      });
+    });*/
+
+    _lessonPlayer.onDurationChanged.listen((Duration d) {
+      setState(() {
+        _currentPlayingDuration = d.inSeconds.toDouble();
+        _currentPlayingPosition = 0.0;
+      });
+    });
+
+    _lessonPlayer.onPositionChanged.listen((Duration p) {
+      setState(() => _currentPlayingPosition = p.inSeconds.toDouble());
+    });
+
+    _lessonPlayer.onPlayerComplete.listen((_) {
+      setState(() {
+        _lessonPlaying = null;
+      });
+    });
+
+    _lessons = fetchList();
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-        future: lessons,
+        future: _lessons,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             dynamic? lessonInfo = snapshot.data;
-            return ListView(
+            var listView = ListView(
               children: <Widget>[
                 // Should check that the type of glyph
                 // is effectively a Map and contains the keys needed
-                if (lessonInfo != null) for (var lesson in lessonInfo) ListTile(
-                  leading: Text(lesson["code"],
-                      style: const TextStyle(fontSize: 23.0,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueGrey)),
-                  title: Text(lesson["name"],
-                      style: const TextStyle(fontSize: 11.0,
-                          fontWeight: FontWeight.normal,
-                          color: Colors.blueAccent))
-                ),
+                if (lessonInfo != null)
+                  for (var lesson in lessonInfo)
+                    ListTile(
+                      leading: Text(lesson["code"],
+                          style: const TextStyle(
+                              fontSize: 23.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueGrey)),
+                      title: Text(lesson["name"],
+                          style: const TextStyle(
+                              fontSize: 11.0,
+                              fontWeight: FontWeight.normal,
+                              color: Colors.blueAccent)),
+                      trailing: lesson["audio"] != null
+                          ? IconButton(
+                              color: Colors.orange,
+                              icon: Icon(_lessonPlaying == lesson
+                                  ? Icons.stop_circle_outlined
+                                  : Icons.play_circle_outline),
+                              onPressed: () => _lessonPlaying == lesson
+                                  ? _stopPlayingLesson()
+                                  : _playLesson(lesson["audio"]))
+                          : null,
+                    ),
               ],
             );
+            // ignore: dead_code
+            if (_lessonPlaying == null) {
+              return listView;
+            } else {
+              return Column(
+                children: <Widget>[
+                  Expanded(child: listView),
+                  Container(
+                    padding: const EdgeInsets.all(5.0),
+                    color: Colors.blueGrey,
+                    height: 100,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(_lessonPlayer.state == PlayerState.playing
+                              ? Icons.pause_sharp
+                              : Icons.play_arrow_outlined),
+                          onPressed: () => _togglePause(),
+                        ),
+                        Expanded(
+                            child: Slider(
+                          value: _currentPlayingPosition,
+                          min: 0.0,
+                          max: _currentPlayingDuration,
+                          onChanged: (double value) {
+                            _lessonPlayer
+                                .seek(Duration(seconds: value.toInt()));
+                          },
+                        )),
+                        IconButton(
+                          icon: const Icon(Icons.close_sharp),
+                          onPressed: () => _stopPlayingLesson(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }
           } else if (snapshot.hasError) {
             return const Center(
               child: Text("Error! Could not load lesson data!",
-                  style: TextStyle(fontSize: 19.0,
+                  style: TextStyle(
+                      fontSize: 19.0,
                       fontWeight: FontWeight.bold,
                       color: Colors.red)),
             );
           } else {
             return const Center(
               child: Text("Loading lesson data...",
-                  style: TextStyle(fontSize: 19.0,
+                  style: TextStyle(
+                      fontSize: 19.0,
                       fontWeight: FontWeight.bold,
                       color: Colors.grey)),
             );
           }
-        }
-    );
+        });
   }
 
+  void _togglePause() {
+    setState(() {
+      if (_lessonPlayer.state == PlayerState.playing) {
+        _lessonPlayer.pause();
+      } else {
+        _lessonPlayer.resume();
+      }
+    });
+  }
+
+  void _playLesson(dynamic lesson) {
+    _lessonPlayer.stop();
+    _lessonPlayer.play(AssetSource("audio/lessons/$lesson"));
+    setState(() => _lessonPlaying = lesson);
+  }
+
+  void _stopPlayingLesson() {
+    _lessonPlayer.stop();
+    setState(() => _lessonPlaying = null);
+  }
+
+  @override
+  void dispose() {
+    _lessonPlayer.stop();
+    _lessonPlayer.dispose();
+    super.dispose();
+  }
 }
